@@ -1,0 +1,65 @@
+{
+    "schemaVersion": "1.7.4",
+    "resources": {
+        "linux": {
+            "user": {
+                "groups": ["pipewire"]
+            }
+        }
+    },
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Axis C6110 Audio Extensions",
+            "appName": "audio_control",
+            "vendor": "MRDN Labs",
+            "embeddedSdkVersion": "3.0",
+            "runMode": "respawn",
+            "version": "1.8.0"
+        },
+        "configuration": {
+            "settingPage": "index.html",
+            "paramConfig": [
+                {
+                    "name": "EnableSpeakerGuard",
+                    "type": "bool",
+                    "default": "yes"
+                },
+                {
+                    "name": "EnableAudioForward",
+                    "type": "bool",
+                    "default": "yes"
+                },
+                {
+                    "name": "RemoteIP",
+                    "type": "string",
+                    "default": "192.168.1.219"
+                },
+                {
+                    "name": "RemoteUser",
+                    "type": "string",
+                    "default": "root"
+                },
+                {
+                    "name": "RemotePass",
+                    "type": "string",
+                    "default": ""
+                },
+                {
+                    "name": "LocalUser",
+                    "type": "string",
+                    "default": "root"
+                },
+                {
+                    "name": "LocalPass",
+                    "type": "string",
+                    "default": "pass"
+                },
+                {
+                    "name": "ActiveMode",
+                    "type": "string",
+                    "default": "instructor"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "schemaVersion": "1.9.0",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Audio Monitor",
+            "appName": "audio_monitor",
+            "vendor": "Custom",
+            "embeddedSdkVersion": "2.0",
+            "runMode": "respawn",
+            "version": "1.0.0"
+        }
+    }
+}

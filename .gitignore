@@ -1,0 +1,24 @@
+.env
+.env.*
+!.env.example
+!.env.devices.example
+/.env.devices
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.old
+*.eap
+*_LICENSE.txt
+tmp*
+
+# Built binaries
+audio_control
+audio_monitor
+audio_investigate
+hello_world
+
+# Generated output directories
+debug/
+build/

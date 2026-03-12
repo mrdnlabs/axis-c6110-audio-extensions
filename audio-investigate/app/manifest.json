@@ -1,0 +1,20 @@
+{
+    "schemaVersion": "1.9.0",
+    "resources": {
+        "linux": {
+            "user": {
+                "groups": ["pipewire"]
+            }
+        }
+    },
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Audio Investigate",
+            "appName": "audio_investigate",
+            "vendor": "Custom",
+            "embeddedSdkVersion": "3.0",
+            "runMode": "never",
+            "version": "1.0.0"
+        }
+    }
+}

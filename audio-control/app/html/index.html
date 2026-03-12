@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Control Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; font-size: 14px; background: #f5f5f5; color: #333; }
+
+    header {
+      background: #1a1a2e; color: #fff;
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    header h1 { font-size: 16px; font-weight: 600; }
+    header span { font-size: 12px; opacity: 0.6; }
+
+    main { max-width: 520px; margin: 24px auto; padding: 0 16px; }
+
+    section {
+      background: #fff; border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      margin-bottom: 16px; overflow: hidden;
+    }
+    section h2 {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: #666;
+      padding: 12px 16px; border-bottom: 1px solid #eee;
+      background: #fafafa;
+    }
+
+    .field { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 12px; }
+    .field:last-child { border-bottom: none; }
+    .field label { flex: 0 0 130px; font-weight: 500; color: #555; }
+    .field input[type=text], .field input[type=password] {
+      flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px;
+      font-size: 14px; outline: none;
+    }
+    .field input:focus { border-color: #4a7fcb; box-shadow: 0 0 0 2px rgba(74,127,203,.15); }
+
+    .toggle-row { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-row label { font-weight: 500; color: #555; }
+    .toggle-row small { display: block; font-size: 12px; color: #999; margin-top: 2px; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #ccc;
+      border-radius: 24px; cursor: pointer; transition: background .2s;
+    }
+    .slider:before {
+      content: ""; position: absolute;
+      width: 18px; height: 18px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: transform .2s;
+    }
+    input:checked + .slider { background: #4a7fcb; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .mode-buttons { padding: 12px 16px; display: flex; gap: 10px; }
+    .mode-btn {
+      flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px;
+      background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: #666; transition: all .15s; text-align: center;
+    }
+    .mode-btn:hover { border-color: #4a7fcb; color: #4a7fcb; }
+    .mode-btn.active { border-color: #4a7fcb; background: #4a7fcb; color: #fff; }
+    .mode-btn:disabled { opacity: .5; cursor: default; }
+
+    .actions { padding: 0 0 24px; display: flex; gap: 10px; }
+    button.save {
+      flex: 1; padding: 11px; background: #4a7fcb; color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    button.save:hover { background: #3a6ab0; }
+    button.save:disabled { background: #aaa; cursor: default; }
+
+    #status {
+      margin-top: 10px; padding: 10px 14px; border-radius: 5px;
+      font-size: 13px; display: none;
+    }
+    #status.ok  { background: #e6f4ea; color: #2d7a3a; display: block; }
+    #status.err { background: #fdecea; color: #c0392b; display: block; }
+
+    .loading { text-align: center; padding: 40px; color: #999; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Audio Control</h1>
+    <span>MRDN Labs</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="loading">Loading settings…</div>
+</main>
+
+<script>
+const GROUP = 'root.audio_control';
+
+async function readParams() {
+  const r = await fetch(`/axis-cgi/param.cgi?action=list&group=${GROUP}`);
+  const text = await r.text();
+  const params = {};
+  for (const line of text.trim().split('\n')) {
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim().replace(`${GROUP}.`, '');
+    params[key] = line.slice(eq + 1).trim();
+  }
+  return params;
+}
+
+async function writeParams(updates) {
+  const qs = Object.entries(updates)
+    .map(([k, v]) => `${GROUP}.${k}=${encodeURIComponent(v)}`)
+    .join('&');
+  const r = await fetch(`/axis-cgi/param.cgi?action=update&${qs}`);
+  const text = await r.text();
+  if (!text.trim().startsWith('OK')) throw new Error(text.trim() || 'Update failed');
+}
+
+function render(p) {
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <section>
+      <h2>Remote Speaker (C1110-E)</h2>
+      <div class="field">
+        <label>IP Address</label>
+        <input type="text" id="RemoteIP" value="${esc(p.RemoteIP || '')}" placeholder="192.168.1.x">
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="RemoteUser" value="${esc(p.RemoteUser || 'root')}" placeholder="root">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="RemotePass" value="${esc(p.RemotePass || '')}" placeholder="password">
+      </div>
+    </section>
+
+    <section>
+      <h2>Features</h2>
+      <div class="toggle-row">
+        <div>
+          <label>Audio Forwarding</label>
+          <small>Stream audio to remote speaker</small>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="EnableAudioForward" ${p.EnableAudioForward === 'yes' ? 'checked' : ''}>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <label>Speaker Guard</label>
+          <small>Keep built-in speaker active with headphones</small>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="EnableSpeakerGuard" ${p.EnableSpeakerGuard === 'yes' ? 'checked' : ''}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Active Mode</h2>
+      <p style="padding:0 16px 4px;font-size:12px;color:#888">Takes effect immediately.</p>
+      <div class="mode-buttons">
+        <button class="mode-btn ${p.ActiveMode === 'instructor' ? 'active' : ''}"
+                onclick="setMode('instructor')">Instructor</button>
+        <button class="mode-btn ${p.ActiveMode === 'classroom' ? 'active' : ''}"
+                onclick="setMode('classroom')">Classroom</button>
+      </div>
+      <div id="mode-status" style="padding:0 16px 12px;font-size:12px;color:#888"></div>
+    </section>
+
+    <div class="actions">
+      <button class="save" onclick="save()">Save Settings</button>
+    </div>
+    <div id="status"></div>
+  `;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+async function setMode(mode) {
+  const btns = document.querySelectorAll('.mode-btn');
+  btns.forEach(b => { b.disabled = true; b.classList.remove('active'); });
+  event.target.classList.add('active');
+
+  const modeStatus = document.getElementById('mode-status');
+  modeStatus.textContent = 'Switching…';
+  modeStatus.style.color = '#888';
+
+  try {
+    await writeParams({ ActiveMode: mode });
+    modeStatus.textContent = `Switched to ${mode} mode.`;
+    modeStatus.style.color = '#2d7a3a';
+    setTimeout(() => { modeStatus.textContent = ''; }, 3000);
+  } catch (e) {
+    modeStatus.textContent = 'Switch failed: ' + e.message;
+    modeStatus.style.color = '#c0392b';
+  }
+
+  btns.forEach(b => { b.disabled = false; });
+}
+
+async function save() {
+  const btn = document.querySelector('button.save');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  status.className = '';
+  status.style.display = 'none';
+
+  try {
+    const updates = {
+      RemoteIP:            document.getElementById('RemoteIP').value.trim(),
+      RemoteUser:          document.getElementById('RemoteUser').value.trim(),
+      RemotePass:          document.getElementById('RemotePass').value,
+      EnableAudioForward:  document.getElementById('EnableAudioForward').checked ? 'yes' : 'no',
+      EnableSpeakerGuard:  document.getElementById('EnableSpeakerGuard').checked ? 'yes' : 'no',
+    };
+    await writeParams(updates);
+    status.textContent = 'Settings saved. Changes take effect on next ACAP restart.';
+    status.className = 'ok';
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'err';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Save Settings';
+}
+
+// Init
+readParams().then(render).catch(e => {
+  document.getElementById('main').innerHTML =
+    `<div class="loading" style="color:#c0392b">Failed to load settings: ${e.message}</div>`;
+});
+</script>
+</body>
+</html>
