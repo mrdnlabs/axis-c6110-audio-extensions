@@ -49,11 +49,13 @@ docker build \
 CONTAINER_ID=$(docker create "$IMAGE_NAME")
 mkdir -p "${APP_PATH}/build"
 
-# Copy all .eap files from the build output
+# Copy build output from the container
 docker cp "${CONTAINER_ID}:/opt/app/" - | tar -xf - -C "${APP_PATH}/build/" --strip-components=1 2>/dev/null || true
 
-# Find the .eap file
-EAP_FILE=$(find "${APP_PATH}/build" -name "*.eap" -type f 2>/dev/null | head -1)
+# Find the newest .eap file produced by the build
+EAP_FILE=$(find "${APP_PATH}/build" -name "*.eap" -type f -printf '%T@ %p\n' 2>/dev/null \
+    | sort -nr \
+    | awk 'NR==1 {print $2}')
 
 docker rm "$CONTAINER_ID" > /dev/null
 
