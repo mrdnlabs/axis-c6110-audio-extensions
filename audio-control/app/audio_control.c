@@ -43,22 +43,30 @@
 struct runtime_config {
     int  enable_speaker_guard;
     int  enable_audio_forward;
+    int  enable_dual_audio;
     char remote_ip[64];
     char remote_user[64];
     char remote_pass[64];
     char local_user[64];
     char local_pass[64];
+    char headphone_node[64];
+    char speaker_node[64];
+    char capture_node[64];
 };
 
 static void load_params(struct runtime_config *cfg) {
     /* Defaults */
     cfg->enable_speaker_guard = 1;
     cfg->enable_audio_forward = 1;
+    cfg->enable_dual_audio    = 0;
     snprintf(cfg->remote_ip,   sizeof(cfg->remote_ip),   "192.168.1.219");
-    snprintf(cfg->remote_user, sizeof(cfg->remote_user), "root");
-    cfg->remote_pass[0] = '\0';
-    snprintf(cfg->local_user,  sizeof(cfg->local_user),  "root");
-    cfg->local_pass[0] = '\0';
+    snprintf(cfg->remote_user, sizeof(cfg->remote_user), "admin");
+    snprintf(cfg->remote_pass, sizeof(cfg->remote_pass), "admin");
+    snprintf(cfg->local_user,  sizeof(cfg->local_user),  "admin");
+    snprintf(cfg->local_pass,  sizeof(cfg->local_pass),  "admin");
+    snprintf(cfg->headphone_node, sizeof(cfg->headphone_node), HEADPHONE_NODE_NAME);
+    snprintf(cfg->speaker_node,   sizeof(cfg->speaker_node),   SPEAKER_NODE_NAME);
+    snprintf(cfg->capture_node,   sizeof(cfg->capture_node),   CAPTURE_NODE_NAME);
 
     AXParameter *ax = ax_parameter_new(APP_NAME, NULL);
     if (!ax) {
@@ -73,6 +81,9 @@ static void load_params(struct runtime_config *cfg) {
 
     if (ax_parameter_get(ax, "EnableAudioForward", &val, NULL) && val)
         { cfg->enable_audio_forward = (strcmp(val, "yes") == 0); g_free(val); val = NULL; }
+
+    if (ax_parameter_get(ax, "EnableDualAudio", &val, NULL) && val)
+        { cfg->enable_dual_audio = (strcmp(val, "yes") == 0); g_free(val); val = NULL; }
 
     if (ax_parameter_get(ax, "RemoteIP", &val, NULL) && val && *val)
         { snprintf(cfg->remote_ip, sizeof(cfg->remote_ip), "%s", val); g_free(val); val = NULL; }
@@ -89,14 +100,24 @@ static void load_params(struct runtime_config *cfg) {
     if (ax_parameter_get(ax, "LocalPass", &val, NULL) && val)
         { snprintf(cfg->local_pass, sizeof(cfg->local_pass), "%s", val); g_free(val); val = NULL; }
 
+    if (ax_parameter_get(ax, "HeadphoneNodeName", &val, NULL) && val && *val)
+        { snprintf(cfg->headphone_node, sizeof(cfg->headphone_node), "%s", val); g_free(val); val = NULL; }
+
+    if (ax_parameter_get(ax, "SpeakerNodeName", &val, NULL) && val && *val)
+        { snprintf(cfg->speaker_node, sizeof(cfg->speaker_node), "%s", val); g_free(val); val = NULL; }
+
+    if (ax_parameter_get(ax, "CaptureNodeName", &val, NULL) && val && *val)
+        { snprintf(cfg->capture_node, sizeof(cfg->capture_node), "%s", val); g_free(val); val = NULL; }
+
     ax_parameter_free(ax);
 
-    syslog(LOG_INFO, "[%s] Config: speaker_guard=%s audio_forward=%s local=%s remote=%s@%s",
+    syslog(LOG_INFO, "[%s] Config: speaker_guard=%s audio_forward=%s local=%s remote=%s@%s nodes=%s/%s/%s",
            APP_NAME,
            cfg->enable_speaker_guard ? "yes" : "no",
            cfg->enable_audio_forward ? "yes" : "no",
            cfg->local_user,
-           cfg->remote_user, cfg->remote_ip);
+           cfg->remote_user, cfg->remote_ip,
+           cfg->headphone_node, cfg->speaker_node, cfg->capture_node);
 }
 
 /* ========== Global State ========== */
@@ -184,8 +205,8 @@ static void setup_mode_actions(struct vapix_client *vapix) {
     }
 
     static const struct { const char *label; const char *desc; const char *mode; } defs[2] = {
-        { "Classroom Mode",  "Unmute C1110-E and headphone, mute C6110 speaker", "classroom" },
-        { "Instructor Mode", "Mute C1110-E, unmute C6110 speaker",               "instructor" },
+        { "Classroom Mode",  "Unmute remote speaker and headphone, mute C6110 speaker", "classroom" },
+        { "Instructor Mode", "Mute remote speaker, unmute C6110 speaker",               "instructor" },
     };
 
     for (int i = 0; i < 2; i++) {
@@ -259,8 +280,8 @@ int main(int argc, char *argv[]) {
             .poll_interval_ms = 500,
             .speaker_device_id = SPEAKER_DEVICE_ID,
             .speaker_output_id = SPEAKER_OUTPUT_ID,
-            .headphone_node_name = HEADPHONE_NODE_NAME,
-            .speaker_node_name = SPEAKER_NODE_NAME,
+            .headphone_node_name = cfg.headphone_node,
+            .speaker_node_name = cfg.speaker_node,
         };
 
         if (speaker_guard_init(&app.sg, &sg_config, &app.vapix, app.pw_loop) < 0) {
@@ -275,7 +296,7 @@ int main(int argc, char *argv[]) {
 
     if (cfg.enable_audio_forward) {
         struct audio_forwarder_config af_config = {
-            .capture_node_name = CAPTURE_NODE_NAME,
+            .capture_node_name = cfg.capture_node,
             .remote_ip   = cfg.remote_ip,
             .remote_user = cfg.remote_user,
             .remote_pass = cfg.remote_pass,
@@ -298,6 +319,7 @@ int main(int argc, char *argv[]) {
             .remote_ip   = cfg.remote_ip,
             .remote_user = cfg.remote_user,
             .remote_pass = cfg.remote_pass,
+            .dual_audio  = cfg.enable_dual_audio,
         };
         if (mode_controller_init(&app.mc, &mc_config, &app.vapix, app.pw_loop) < 0)
             syslog(LOG_ERR, "[%s] Mode controller init failed", APP_NAME);

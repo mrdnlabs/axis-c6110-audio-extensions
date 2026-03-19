@@ -25,7 +25,7 @@
  * Discovered by querying getDevicesSettings on each device:
  *   C6110 OUT0 (headphone) : connType="headphone", sigType="unbalanced", channels 0+1
  *   C6110 OUT1 (speaker)   : connType="internal",  sigType="unbalanced", channel  0
- *   C1110-E OUT0 (speaker) : connType="internal",  sigType="unbalanced", channel  0
+ *   Remote speaker OUT0    : connType="internal",  sigType="unbalanced", channel  0
  */
 struct output_spec {
     const char *dev_id;
@@ -41,7 +41,7 @@ static const struct output_spec C6110_HEADPHONE = {
 static const struct output_spec C6110_SPEAKER = {
     "0", "1", "internal", "unbalanced", {"0", NULL}
 };
-static const struct output_spec C1110_SPEAKER = {
+static const struct output_spec REMOTE_SPEAKER = {
     "0", "0", "internal", "unbalanced", {"0", NULL}
 };
 
@@ -117,11 +117,11 @@ static void *apply_mode_thread(void *data) {
     syslog(LOG_INFO, "[%s] Applying mode: %s", APP_NAME, mode);
 
     /*
-     * classroom:   OUT1 unmuted, OUT2 muted, C1110-E unmuted
-     * instructor:  OUT1 muted,   OUT2 unmuted, C1110-E muted
+     * classroom:   OUT1 unmuted, OUT2 muted, remote speaker unmuted
+     * instructor:  OUT1 muted,   OUT2 unmuted, remote speaker muted
      */
     int out1_muted = is_classroom ? 0 : 1;
-    int out2_muted = is_classroom ? 1 : 0;
+    int out2_muted = (is_classroom && !args->config.dual_audio) ? 1 : 0;
     int c1110_muted = is_classroom ? 0 : 1;
 
     if (set_local_output_muted(args->vapix, &C6110_HEADPHONE, out1_muted) < 0)
@@ -134,10 +134,10 @@ static void *apply_mode_thread(void *data) {
     else
         syslog(LOG_INFO, "[%s] C6110 OUT2 (speaker) muted=%d", APP_NAME, out2_muted);
 
-    if (set_remote_output_muted(&args->config, &C1110_SPEAKER, c1110_muted) < 0)
-        syslog(LOG_WARNING, "[%s] Failed to set C1110-E mute=%d", APP_NAME, c1110_muted);
+    if (set_remote_output_muted(&args->config, &REMOTE_SPEAKER, c1110_muted) < 0)
+        syslog(LOG_WARNING, "[%s] Failed to set remote speaker mute=%d", APP_NAME, c1110_muted);
     else
-        syslog(LOG_INFO, "[%s] C1110-E output muted=%d", APP_NAME, c1110_muted);
+        syslog(LOG_INFO, "[%s] Remote speaker muted=%d", APP_NAME, c1110_muted);
 
     free(args);
     return NULL;

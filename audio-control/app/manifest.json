@@ -30,6 +30,11 @@
                     "default": "yes"
                 },
                 {
+                    "name": "EnableDualAudio",
+                    "type": "bool",
+                    "default": "no"
+                },
+                {
                     "name": "RemoteIP",
                     "type": "string",
                     "default": "192.168.1.219"
@@ -37,27 +42,42 @@
                 {
                     "name": "RemoteUser",
                     "type": "string",
-                    "default": "root"
+                    "default": "admin"
                 },
                 {
                     "name": "RemotePass",
                     "type": "string",
-                    "default": ""
+                    "default": "admin"
                 },
                 {
                     "name": "LocalUser",
                     "type": "string",
-                    "default": "root"
+                    "default": "admin"
                 },
                 {
                     "name": "LocalPass",
                     "type": "string",
-                    "default": "pass"
+                    "default": "admin"
                 },
                 {
                     "name": "ActiveMode",
                     "type": "string",
                     "default": "instructor"
+                },
+                {
+                    "name": "HeadphoneNodeName",
+                    "type": "string",
+                    "default": "AudioDevice0Output0"
+                },
+                {
+                    "name": "SpeakerNodeName",
+                    "type": "string",
+                    "default": "AudioDevice0Output1"
+                },
+                {
+                    "name": "CaptureNodeName",
+                    "type": "string",
+                    "default": "AudioDevice0Outputs"
                 }
             ]
         }

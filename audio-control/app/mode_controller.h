@@ -11,11 +11,11 @@
  *
  *   instructor  — C6110 OUT1 (headphone): MUTED
  *                 C6110 OUT2 (speaker):   UNMUTED
- *                 C1110-E output:         MUTED
+ *                 Remote speaker output:  MUTED
  *
  *   classroom   — C6110 OUT1 (headphone): UNMUTED
  *                 C6110 OUT2 (speaker):   MUTED
- *                 C1110-E output:         UNMUTED
+ *                 Remote speaker output:  UNMUTED
  *
  * Mode is read from the ACAP parameter "ActiveMode" and applied within ~1 second
  * of any change. Set the parameter via VAPIX:
@@ -29,6 +29,7 @@ struct mode_controller_config {
     const char *remote_ip;
     const char *remote_user;
     const char *remote_pass;
+    int dual_audio; /* keep C6110 speaker active in classroom mode */
 };
 
 struct mode_controller {
@@ -37,6 +38,7 @@ struct mode_controller {
     struct pw_main_loop *pw_loop;
     struct spa_source *poll_timer;
     char current_mode[32]; /* last applied mode */
+    int dual_audio;        /* cached from config */
 };
 
 int  mode_controller_init(struct mode_controller *mc,

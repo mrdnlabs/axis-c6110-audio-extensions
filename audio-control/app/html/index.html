@@ -78,6 +78,14 @@
     button.save:hover { background: #3a6ab0; }
     button.save:disabled { background: #aaa; cursor: default; }
 
+    button.restart {
+      flex: 1; padding: 11px; background: #e67e22; color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    button.restart:hover { background: #cf6d17; }
+    button.restart:disabled { background: #aaa; cursor: default; }
+
     #status {
       margin-top: 10px; padding: 10px 14px; border-radius: 5px;
       font-size: 13px; display: none;
@@ -111,7 +119,7 @@ async function readParams() {
   for (const line of text.trim().split('\n')) {
     const eq = line.indexOf('=');
     if (eq < 0) continue;
-    const key = line.slice(0, eq).trim().replace(`${GROUP}.`, '');
+    const key = line.slice(0, eq).trim().split('.').pop();
     params[key] = line.slice(eq + 1).trim();
   }
   return params;
@@ -126,11 +134,27 @@ async function writeParams(updates) {
   if (!text.trim().startsWith('OK')) throw new Error(text.trim() || 'Update failed');
 }
 
+// Params as the ACAP loaded them at startup — used to detect pending restart
+let activeParams = {};
+
 function render(p) {
+  activeParams = Object.assign({}, p);
   const main = document.getElementById('main');
   main.innerHTML = `
     <section>
-      <h2>Remote Speaker (C1110-E)</h2>
+      <h2>Local Device (This C6110)</h2>
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="LocalUser" value="${esc(p.LocalUser || 'root')}" placeholder="root">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="LocalPass" value="${esc(p.LocalPass || '')}" placeholder="password">
+      </div>
+    </section>
+
+    <section>
+      <h2>Remote Network Speaker</h2>
       <div class="field">
         <label>IP Address</label>
         <input type="text" id="RemoteIP" value="${esc(p.RemoteIP || '')}" placeholder="192.168.1.x">
@@ -153,7 +177,17 @@ function render(p) {
           <small>Stream audio to remote speaker</small>
         </div>
         <label class="switch">
-          <input type="checkbox" id="EnableAudioForward" ${p.EnableAudioForward === 'yes' ? 'checked' : ''}>
+          <input type="checkbox" id="EnableAudioForward" ${p.EnableAudioForward === 'yes' ? 'checked' : ''} onchange="toggleDualAudio(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row" id="dual-audio-row" style="${p.EnableAudioForward === 'yes' ? '' : 'display:none'}">
+        <div style="padding-left:16px">
+          <label>Dual Audio</label>
+          <small>C6110 speaker while in Classroom mode</small>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="EnableDualAudio" ${p.EnableDualAudio === 'yes' ? 'checked' : ''}>
           <span class="slider"></span>
         </label>
       </div>
@@ -181,8 +215,10 @@ function render(p) {
       <div id="mode-status" style="padding:0 16px 12px;font-size:12px;color:#888"></div>
     </section>
 
-    <div class="actions">
+
+<div class="actions">
       <button class="save" onclick="save()">Save Settings</button>
+      <button class="restart" id="restart-btn" onclick="restartApp()" style="display:none">Restart App</button>
     </div>
     <div id="status"></div>
   `;
@@ -224,15 +260,19 @@ async function save() {
 
   try {
     const updates = {
+      LocalUser:           document.getElementById('LocalUser').value.trim(),
+      LocalPass:           document.getElementById('LocalPass').value,
       RemoteIP:            document.getElementById('RemoteIP').value.trim(),
       RemoteUser:          document.getElementById('RemoteUser').value.trim(),
       RemotePass:          document.getElementById('RemotePass').value,
       EnableAudioForward:  document.getElementById('EnableAudioForward').checked ? 'yes' : 'no',
+      EnableDualAudio:     document.getElementById('EnableDualAudio').checked ? 'yes' : 'no',
       EnableSpeakerGuard:  document.getElementById('EnableSpeakerGuard').checked ? 'yes' : 'no',
     };
     await writeParams(updates);
-    status.textContent = 'Settings saved. Changes take effect on next ACAP restart.';
+    status.textContent = 'Settings saved.';
     status.className = 'ok';
+    checkPendingRestart();
   } catch (e) {
     status.textContent = 'Error: ' + e.message;
     status.className = 'err';
@@ -240,6 +280,44 @@ async function save() {
 
   btn.disabled = false;
   btn.textContent = 'Save Settings';
+}
+
+function toggleDualAudio(enabled) {
+  const row = document.getElementById('dual-audio-row');
+  if (row) row.style.display = enabled ? '' : 'none';
+}
+
+function getFormValues() {
+  return {
+    LocalUser:          document.getElementById('LocalUser').value.trim(),
+    LocalPass:          document.getElementById('LocalPass').value,
+    RemoteIP:           document.getElementById('RemoteIP').value.trim(),
+    RemoteUser:         document.getElementById('RemoteUser').value.trim(),
+    RemotePass:         document.getElementById('RemotePass').value,
+    EnableAudioForward: document.getElementById('EnableAudioForward').checked ? 'yes' : 'no',
+    EnableDualAudio:    document.getElementById('EnableDualAudio').checked ? 'yes' : 'no',
+    EnableSpeakerGuard: document.getElementById('EnableSpeakerGuard').checked ? 'yes' : 'no',
+  };
+}
+
+function checkPendingRestart() {
+  const current = getFormValues();
+  const pending = Object.keys(current).some(k => current[k] !== (activeParams[k] || ''));
+  const btn = document.getElementById('restart-btn');
+  if (btn) btn.style.display = pending ? '' : 'none';
+}
+
+async function restartApp() {
+  const btn = document.getElementById('restart-btn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  status.textContent = 'Restarting app — page will reload shortly…';
+  status.className = 'ok';
+  try {
+    await fetch(`/axis-cgi/applications/control.cgi?action=restart&package=audio_control`);
+  } catch (_) { /* device may drop the connection during restart */ }
+  setTimeout(() => location.reload(), 5000);
 }
 
 // Init
