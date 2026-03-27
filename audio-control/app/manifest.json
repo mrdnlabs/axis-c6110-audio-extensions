@@ -1,10 +1,15 @@
 {
-    "schemaVersion": "1.7.4",
+    "schemaVersion": "1.9.0",
     "resources": {
         "linux": {
             "user": {
                 "groups": ["pipewire"]
             }
+        },
+        "dbus": {
+            "requiredMethods": [
+                "com.axis.HTTPConf1.VAPIXServiceAccounts1.GetCredentials"
+            ]
         }
     },
     "acapPackageConf": {
@@ -14,7 +19,7 @@
             "vendor": "MRDN Labs",
             "embeddedSdkVersion": "3.0",
             "runMode": "respawn",
-            "version": "1.8.0"
+            "version": "2.0.0"
         },
         "configuration": {
             "settingPage": "index.html",
@@ -37,27 +42,17 @@
                 {
                     "name": "RemoteIP",
                     "type": "string",
-                    "default": "192.168.1.219"
+                    "default": ""
                 },
                 {
                     "name": "RemoteUser",
                     "type": "string",
-                    "default": "admin"
+                    "default": ""
                 },
                 {
                     "name": "RemotePass",
                     "type": "string",
-                    "default": "admin"
-                },
-                {
-                    "name": "LocalUser",
-                    "type": "string",
-                    "default": "admin"
-                },
-                {
-                    "name": "LocalPass",
-                    "type": "string",
-                    "default": "admin"
+                    "default": ""
                 },
                 {
                     "name": "ActiveMode",

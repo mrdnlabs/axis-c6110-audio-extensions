@@ -142,18 +142,6 @@ function render(p) {
   const main = document.getElementById('main');
   main.innerHTML = `
     <section>
-      <h2>Local Device (This C6110)</h2>
-      <div class="field">
-        <label>Username</label>
-        <input type="text" id="LocalUser" value="${esc(p.LocalUser || 'root')}" placeholder="root">
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input type="password" id="LocalPass" value="${esc(p.LocalPass || '')}" placeholder="password">
-      </div>
-    </section>
-
-    <section>
       <h2>Remote Network Speaker</h2>
       <div class="field">
         <label>IP Address</label>
@@ -260,8 +248,6 @@ async function save() {
 
   try {
     const updates = {
-      LocalUser:           document.getElementById('LocalUser').value.trim(),
-      LocalPass:           document.getElementById('LocalPass').value,
       RemoteIP:            document.getElementById('RemoteIP').value.trim(),
       RemoteUser:          document.getElementById('RemoteUser').value.trim(),
       RemotePass:          document.getElementById('RemotePass').value,
@@ -289,8 +275,6 @@ function toggleDualAudio(enabled) {
 
 function getFormValues() {
   return {
-    LocalUser:          document.getElementById('LocalUser').value.trim(),
-    LocalPass:          document.getElementById('LocalPass').value,
     RemoteIP:           document.getElementById('RemoteIP').value.trim(),
     RemoteUser:         document.getElementById('RemoteUser').value.trim(),
     RemotePass:         document.getElementById('RemotePass').value,

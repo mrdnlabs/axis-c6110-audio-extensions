@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include "vapix_client.h"
+#include "vapix_credentials.h"
 #include "speaker_guard.h"
 #include "audio_forwarder.h"
 #include "mode_controller.h"
@@ -47,8 +48,6 @@ struct runtime_config {
     char remote_ip[64];
     char remote_user[64];
     char remote_pass[64];
-    char local_user[64];
-    char local_pass[64];
     char headphone_node[64];
     char speaker_node[64];
     char capture_node[64];
@@ -59,11 +58,9 @@ static void load_params(struct runtime_config *cfg) {
     cfg->enable_speaker_guard = 1;
     cfg->enable_audio_forward = 1;
     cfg->enable_dual_audio    = 0;
-    snprintf(cfg->remote_ip,   sizeof(cfg->remote_ip),   "192.168.1.219");
-    snprintf(cfg->remote_user, sizeof(cfg->remote_user), "admin");
-    snprintf(cfg->remote_pass, sizeof(cfg->remote_pass), "admin");
-    snprintf(cfg->local_user,  sizeof(cfg->local_user),  "admin");
-    snprintf(cfg->local_pass,  sizeof(cfg->local_pass),  "admin");
+    cfg->remote_ip[0]   = '\0';
+    cfg->remote_user[0] = '\0';
+    cfg->remote_pass[0] = '\0';
     snprintf(cfg->headphone_node, sizeof(cfg->headphone_node), HEADPHONE_NODE_NAME);
     snprintf(cfg->speaker_node,   sizeof(cfg->speaker_node),   SPEAKER_NODE_NAME);
     snprintf(cfg->capture_node,   sizeof(cfg->capture_node),   CAPTURE_NODE_NAME);
@@ -94,12 +91,6 @@ static void load_params(struct runtime_config *cfg) {
     if (ax_parameter_get(ax, "RemotePass", &val, NULL) && val)
         { snprintf(cfg->remote_pass, sizeof(cfg->remote_pass), "%s", val); g_free(val); val = NULL; }
 
-    if (ax_parameter_get(ax, "LocalUser", &val, NULL) && val && *val)
-        { snprintf(cfg->local_user, sizeof(cfg->local_user), "%s", val); g_free(val); val = NULL; }
-
-    if (ax_parameter_get(ax, "LocalPass", &val, NULL) && val)
-        { snprintf(cfg->local_pass, sizeof(cfg->local_pass), "%s", val); g_free(val); val = NULL; }
-
     if (ax_parameter_get(ax, "HeadphoneNodeName", &val, NULL) && val && *val)
         { snprintf(cfg->headphone_node, sizeof(cfg->headphone_node), "%s", val); g_free(val); val = NULL; }
 
@@ -111,12 +102,11 @@ static void load_params(struct runtime_config *cfg) {
 
     ax_parameter_free(ax);
 
-    syslog(LOG_INFO, "[%s] Config: speaker_guard=%s audio_forward=%s local=%s remote=%s@%s nodes=%s/%s/%s",
+    syslog(LOG_INFO, "[%s] Config: speaker_guard=%s audio_forward=%s remote=%s nodes=%s/%s/%s",
            APP_NAME,
            cfg->enable_speaker_guard ? "yes" : "no",
            cfg->enable_audio_forward ? "yes" : "no",
-           cfg->local_user,
-           cfg->remote_user, cfg->remote_ip,
+           cfg->remote_ip,
            cfg->headphone_node, cfg->speaker_node, cfg->capture_node);
 }
 
@@ -132,17 +122,17 @@ struct app {
 
 /* ========== Action pre-configuration ========== */
 
-#define ACTIONS_URL "http://127.0.0.1/config/rest/paging-console-actions/v1/actions"
+#define ACTIONS_URL "http://127.0.0.12/config/rest/paging-console-actions/v1/actions"
 
 static json_t *build_action(const char *label, const char *description,
                              const char *mode, const char *user, const char *pass) {
     char param_url[256];
     snprintf(param_url, sizeof(param_url),
-             "http://127.0.0.1/axis-cgi/param.cgi"
+             "http://127.0.0.12/axis-cgi/param.cgi"
              "?action=update&root.audio_control.ActiveMode=%s", mode);
 
     json_t *recipient = json_object();
-    json_object_set_new(recipient, "authenticationMethod", json_string("digest"));
+    json_object_set_new(recipient, "authenticationMethod", json_string("basic"));
     json_object_set_new(recipient, "hasPassword", json_true());
     json_object_set_new(recipient, "password", json_string(pass));
     json_object_set_new(recipient, "port", json_integer(80));
@@ -170,9 +160,30 @@ static json_t *build_action(const char *label, const char *description,
     return body;
 }
 
+/* Delete an action by ID */
+static void delete_action(struct vapix_client *vapix, const char *action_id) {
+    char url[512];
+    snprintf(url, sizeof(url), "%s/%s", ACTIONS_URL, action_id);
+
+    CURL *handle = curl_easy_init();
+    if (!handle) return;
+
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+    curl_easy_setopt(handle, CURLOPT_USERPWD, vapix->credentials);
+    curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, "DELETE");
+
+    CURLcode res = curl_easy_perform(handle);
+    if (res != CURLE_OK)
+        syslog(LOG_WARNING, "[%s] Failed to delete action %s: %s",
+               APP_NAME, action_id, curl_easy_strerror(res));
+
+    curl_easy_cleanup(handle);
+}
+
 static void setup_mode_actions(struct vapix_client *vapix) {
     /* Parse "user:pass" from the vapix client credentials */
-    char user[64] = "root", pass[64] = "";
+    char user[64] = "", pass[64] = "";
     if (vapix->credentials) {
         char *colon = strchr(vapix->credentials, ':');
         if (colon) {
@@ -185,8 +196,11 @@ static void setup_mode_actions(struct vapix_client *vapix) {
         }
     }
 
-    /* Fetch existing actions to avoid duplicates */
-    int has_classroom = 0, has_instructor = 0;
+    /*
+     * Delete existing mode actions and recreate them.
+     * D-Bus credentials are transient and change on each ACAP startup,
+     * so the stored action credentials must be refreshed each time.
+     */
     json_t *list = vapix_local_get(vapix, ACTIONS_URL);
     if (list) {
         json_t *data = json_object_get(list, "data");
@@ -195,8 +209,13 @@ static void setup_mode_actions(struct vapix_client *vapix) {
         json_array_foreach(data, i, action) {
             const char *lbl = json_string_value(json_object_get(action, "label"));
             if (!lbl) continue;
-            if (strcmp(lbl, "Classroom Mode") == 0)  has_classroom = 1;
-            if (strcmp(lbl, "Instructor Mode") == 0) has_instructor = 1;
+            if (strcmp(lbl, "Classroom Mode") == 0 || strcmp(lbl, "Instructor Mode") == 0) {
+                const char *id = json_string_value(json_object_get(action, "id"));
+                if (id) {
+                    syslog(LOG_INFO, "[%s] Removing stale action: %s (id=%s)", APP_NAME, lbl, id);
+                    delete_action(vapix, id);
+                }
+            }
         }
         json_decref(list);
     } else {
@@ -210,12 +229,6 @@ static void setup_mode_actions(struct vapix_client *vapix) {
     };
 
     for (int i = 0; i < 2; i++) {
-        int exists = (i == 0) ? has_classroom : has_instructor;
-        if (exists) {
-            syslog(LOG_INFO, "[%s] Action already exists: %s", APP_NAME, defs[i].label);
-            continue;
-        }
-
         json_t *body = build_action(defs[i].label, defs[i].desc, defs[i].mode, user, pass);
         json_t *resp = vapix_local_post(vapix, ACTIONS_URL, body);
         json_decref(body);
@@ -264,13 +277,15 @@ int main(int argc, char *argv[]) {
     pw_loop_add_signal(loop, SIGINT, on_signal, &app);
     pw_loop_add_signal(loop, SIGTERM, on_signal, &app);
 
-    /* Initialize VAPIX client */
-    char local_creds[128];
-    snprintf(local_creds, sizeof(local_creds), "%s:%s", cfg.local_user, cfg.local_pass);
-    if (vapix_client_init(&app.vapix, local_creds) < 0) {
-        syslog(LOG_WARNING, "[%s] VAPIX client init failed (speaker guard Approach A unavailable)",
+    /* Initialize VAPIX client with D-Bus service account credentials */
+    char *local_creds = vapix_get_credentials(APP_NAME);
+    if (!local_creds) {
+        syslog(LOG_WARNING, "[%s] D-Bus credential retrieval failed — VAPIX calls will be unavailable",
                APP_NAME);
+    } else if (vapix_client_init(&app.vapix, local_creds) < 0) {
+        syslog(LOG_WARNING, "[%s] VAPIX client init failed", APP_NAME);
     }
+    free(local_creds);
 
     setup_mode_actions(&app.vapix);
 

@@ -1,10 +1,10 @@
 PROG1	= $(shell jq -r '.acapPackageConf.setup.appName' manifest.json)
-SRCS	= audio_control.c vapix_client.c speaker_guard.c audio_forwarder.c mode_controller.c
+SRCS	= audio_control.c vapix_client.c vapix_credentials.c speaker_guard.c audio_forwarder.c mode_controller.c
 OBJS	= $(SRCS:.c=.o)
 PROGS	= $(PROG1)
 DEBUG_DIR = debug
 
-PKGS = libpipewire-0.3 libcurl jansson axparameter glib-2.0
+PKGS = libpipewire-0.3 libcurl jansson axparameter gio-2.0
 
 CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
 LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS)) -lm -lpthread

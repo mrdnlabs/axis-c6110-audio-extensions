@@ -11,7 +11,7 @@
 #include <string.h>
 
 #define APP_NAME "audio_control"
-#define LOCAL_BASE_URL "http://127.0.0.1/axis-cgi/"
+#define LOCAL_BASE_URL "http://127.0.0.12/axis-cgi/"
 
 /* Curl write callback: append to a dynamically allocated buffer */
 struct response_buf {
@@ -93,7 +93,7 @@ json_t *vapix_call(struct vapix_client *client,
     curl_easy_reset(client->handle);
     curl_easy_setopt(client->handle, CURLOPT_URL, url);
     curl_easy_setopt(client->handle, CURLOPT_USERPWD, client->credentials);
-    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
+    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     curl_easy_setopt(client->handle, CURLOPT_POSTFIELDS, request_str);
     curl_easy_setopt(client->handle, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(client->handle, CURLOPT_WRITEDATA, &response);
@@ -146,7 +146,7 @@ json_t *vapix_local_get(struct vapix_client *client, const char *url) {
     curl_easy_reset(client->handle);
     curl_easy_setopt(client->handle, CURLOPT_URL, url);
     curl_easy_setopt(client->handle, CURLOPT_USERPWD, client->credentials);
-    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
+    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     curl_easy_setopt(client->handle, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(client->handle, CURLOPT_WRITEDATA, &response);
 
@@ -177,7 +177,7 @@ json_t *vapix_local_post(struct vapix_client *client, const char *url, json_t *b
     curl_easy_reset(client->handle);
     curl_easy_setopt(client->handle, CURLOPT_URL, url);
     curl_easy_setopt(client->handle, CURLOPT_USERPWD, client->credentials);
-    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
+    curl_easy_setopt(client->handle, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     curl_easy_setopt(client->handle, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(client->handle, CURLOPT_POSTFIELDS, body_str);
     curl_easy_setopt(client->handle, CURLOPT_WRITEFUNCTION, write_callback);

@@ -1,0 +1,6 @@
+app/*.eap
+app/*.o
+app/audio_control
+app/debug/
+.env.devices
+.git

@@ -8,4 +8,9 @@ FROM ${REPO}/${SDK}:${VERSION}-${ARCH}-ubuntu${UBUNTU_VERSION}
 
 WORKDIR /opt/app
 COPY ./app .
+
+# Fix WSL 777 permissions — required for reverse proxy rules to be created
+RUN find . -type f -exec chmod 644 {} + && \
+    find . -type d -exec chmod 755 {} +
+
 RUN . /opt/axis/acapsdk/environment-setup* && acap-build .

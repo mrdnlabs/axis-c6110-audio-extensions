@@ -38,7 +38,6 @@ struct mode_controller {
     struct pw_main_loop *pw_loop;
     struct spa_source *poll_timer;
     char current_mode[32]; /* last applied mode */
-    int dual_audio;        /* cached from config */
 };
 
 int  mode_controller_init(struct mode_controller *mc,

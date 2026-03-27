@@ -5,10 +5,12 @@
 #include <jansson.h>
 
 /**
- * VAPIX client for making API calls to the local device (127.0.0.1)
+ * VAPIX client for making API calls to the local device (127.0.0.12)
  * and remote Axis devices.
  *
- * Uses explicit credentials ("user:pass") for the local VAPIX API.
+ * Local calls use VAPIX service account credentials obtained via D-Bus
+ * (see vapix_credentials.h). Remote calls use user-supplied credentials
+ * with digest auth.
  */
 
 struct vapix_client {
@@ -16,7 +18,7 @@ struct vapix_client {
     char *credentials;  /* "user:password" */
 };
 
-/* Initialize VAPIX client with explicit credentials (e.g. "root:pass") */
+/* Initialize VAPIX client with credentials (e.g. "user:pass" from D-Bus) */
 int vapix_client_init(struct vapix_client *client, const char *credentials);
 
 /* Cleanup */
